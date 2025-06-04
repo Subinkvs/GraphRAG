@@ -12,7 +12,7 @@ async def main():
 
     neo4j_uri = "neo4j://localhost:7687"
     neo4j_user = "neo4j"
-    neo4j_password = "password"
+    neo4j_password = "ifcrag123@"
 
     database_name = "test2.db"
 
