@@ -2,15 +2,17 @@ import asyncio
 from neo4j import GraphDatabase
 from chatbot import Chatbot
 from ifc_to_neo4j import process_ifc_file
+from dotenv import load_dotenv
+load_dotenv()
 
 def connect_to_neo4j(uri, user, password):
     driver = GraphDatabase.driver(uri, auth=(user, password))
     return driver
 
 async def main():
-    ifc_file_path = r"C:\Users\Public\Solibri\SOLIBRI\Samples\ifc\Solibri Building Structural.ifc"
+    ifc_file_path = r"C:\Users\USER\Downloads\AT-F_Ver1.ifc"
 
-    neo4j_uri = "neo4j://localhost:7687"
+    neo4j_uri = "bolt://localhost:7687"
     neo4j_user = "neo4j"
     neo4j_password = "ifcrag123@"
 
