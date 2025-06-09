@@ -10,7 +10,7 @@ def connect_to_neo4j(uri, user, password):
     return driver
 
 async def main():
-    ifc_file_path = r"C:\Users\USER\Downloads\AT-F_Ver1.ifc"
+    ifc_file_path = r"C:\Users\USER\Downloads\Tabel_Chairs.ifc.txt"
 
     neo4j_uri = "bolt://localhost:7687"
     neo4j_user = "neo4j"
