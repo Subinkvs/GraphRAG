@@ -124,7 +124,7 @@ def get_or_create_agent(chatbot):
     ]
 
     llm_client = AzureChatOpenAI(
-        deployment_name="gpt-4o-mini", 
+        deployment_name="gpt-4o-mini-2", 
         temperature=0.3, 
         max_tokens=4000
     ).bind_tools(tools)
