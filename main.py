@@ -1,45 +1,91 @@
+import os
+import uuid
 import asyncio
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 from neo4j import GraphDatabase
-from chatbot import Chatbot
-from ifc_to_neo4j import process_ifc_file
 from dotenv import load_dotenv
+
+from ifc_to_neo4j import process_ifc_file
+from chatbot import Chatbot
+
+# Load .env values
 load_dotenv()
 
-def connect_to_neo4j(uri, user, password):
-    driver = GraphDatabase.driver(uri, auth=(user, password))
-    return driver
+# Flask app setup
+app = Flask(__name__)
+CORS(app)
 
-async def main():
-    ifc_file_path = r"C:\Users\USER\Downloads\AT-F_Ver1 (1).ifc"
+# Neo4j connection setup
+NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "ifcrag123@")
+DATABASE_NAME = os.getenv("NEO4J_DB_NAME", "test2.db")
 
-    neo4j_uri = "bolt://localhost:7687"
-    neo4j_user = "neo4j"
-    neo4j_password = "ifcrag123@"
+# Connect to Neo4j
+driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
-    database_name = "test2.db"
+# Instantiate and initialize chatbot globally
+chatbot = Chatbot()
+chatbot.initialize(driver, DATABASE_NAME)
 
-    fill_db = True
+# ======== API 1: Upload IFC File and Process it ========
+@app.route('/upload-ifc', methods=['POST'])
+def upload_ifc():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part in request'}), 400
 
-    driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_user, neo4j_password))
+    file = request.files['file']
 
-    if fill_db:
-        process_ifc_file(ifc_file_path, driver, database_name)
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
 
-    bot = Chatbot()
-    bot.initialize(driver, database_name)
+    if not file.filename.lower().endswith('.ifc'):
+        return jsonify({'error': 'Only .ifc files are allowed'}), 400
 
-    while True:
-        user_input = input("\nYou: ")
-        
-        if user_input.lower() in {"exit", "quit", "bye"}:
-            print("Exiting chat. Goodbye!")
-            break
-        
-        try:
-            bot_response = await bot.message(user_input)
-            print(f"\nBot: {bot_response}")
-        except Exception as e:
-            print(f"An error occurred: {e}")
+    try:
+        # Save to a temporary file
+        os.makedirs('temp_uploads', exist_ok=True)
+        filename = f"temp_{uuid.uuid4().hex}_{file.filename}"
+        filepath = os.path.join('temp_uploads', filename)
+        file.save(filepath)
 
-if __name__ == "__main__":
-    asyncio.run(main())
+        # Process the IFC file and load into Neo4j
+        process_ifc_file(filepath, driver, DATABASE_NAME)
+
+        # Optional: Remove after processing
+        os.remove(filepath)
+
+        return jsonify({'message': 'IFC file uploaded and processed successfully'}), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ======== API 2: Chat with the Bot ========
+@app.route('/chat', methods=['POST'])
+def chat():
+    data = request.get_json()
+    message = data.get('message', '')
+
+    if not message.strip():
+        return jsonify({'error': 'Empty message'}), 400
+
+    try:
+        # Run the async chatbot method inside the Flask sync route
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        response = loop.run_until_complete(chatbot.message(message))
+                # Split response into structured lines
+        lines = [line.strip() for line in response.split('\n') if line.strip()]
+
+        return jsonify({
+            'response': lines  # List of each line for UI or structured use
+        }), 200
+
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ======== Main Entrypoint ========
+if __name__ == '__main__':
+    app.run(debug=True)
